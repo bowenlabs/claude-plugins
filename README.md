@@ -91,6 +91,46 @@ The skills ask the Louise knowledge server for the house position rather than
 restating it, so they stay current as the decisions change. Its tools appear
 as `mcp__plugin_louise_louise__*`.
 
+## Review in CI
+
+`.github/workflows/louise-review.yml` is a reusable workflow that runs the
+`louise:reviewer` agent on a pull request and posts one comment. It edits
+that comment on each later push, and never edits files, pushes, or approves.
+It skips drafts, pull requests from bots, and pull requests from forks, which
+GitHub runs without secrets. It lives in this repository because this one is
+public, and a public repository can't call a reusable workflow stored in a
+private one.
+
+A repository calls it from its own workflow:
+
+```yaml
+name: Louise review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    uses: bowenlabs/claude-plugins/.github/workflows/louise-review.yml@main
+    secrets:
+      claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      louise_token: ${{ secrets.LOUISE_REVIEW_TOKEN }}
+```
+
+It needs two secrets:
+
+- **A Claude credential:** a Claude Code OAuth token from `claude setup-token`,
+  passed as `claude_code_oauth_token`, or an Anthropic API key, passed as
+  `anthropic_api_key`.
+- **A Louise read token,** passed as `louise_token`. In a public repository,
+  give it `public` visibility only, so a review there can't quote a private
+  source. The louise-ops RUNBOOK says how to make and rotate one.
+
 ## Evals
 
 `plugins/louise/evals/` holds one case for each of the plugin's acceptance
