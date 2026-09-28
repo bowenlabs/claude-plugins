@@ -2,7 +2,7 @@
   "mcpServers": {
     "louise": {
       "type": "http",
-      "url": "https://louise.bowenlabs.io/mcp",
+      "url": "https://louise.bowenlabs.app/mcp",
       "headers": {
         "Authorization": "Bearer ${LOUISE_KNOWLEDGE_TOKEN:-unset}"
       }
