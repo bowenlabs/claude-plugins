@@ -46,7 +46,10 @@ place with the Edit tool:
 - **Dashes:** a dash is for sentences only. Page titles use a pipe, and items
   side by side use a middle dot.
 - **Links:** descriptive link text, never "click here" or "this link".
-- **The house vocabulary** from step 1, such as its preferred terms.
+- **The house rules** from step 1: apply every rule `style_rules` returns, not
+  only the ones listed here, such as its example conventions (placeholder
+  domains, company names, and phone numbers in place of real ones) and its
+  preferred terms.
 - **Client names:** in a public repository, name no client site. Keep the
   reason and describe the site generically.
 

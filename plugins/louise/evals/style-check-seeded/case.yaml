@@ -1,5 +1,5 @@
 schema_version: "1.1"
 name: style-check-seeded
-description: A doc seeded with Google-style violations. The check has to fix them in place.
+description: A doc seeded with Google-style violations and with house-only ones (real brands and phone numbers in examples, spaced dashes, a dash as a page-title separator), which only Louise's style_rules explains. The check has to fix them all in place.
 context:
   scaffold_script: scaffold.sh
