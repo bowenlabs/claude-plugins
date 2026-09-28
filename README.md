@@ -7,7 +7,7 @@ the Louise / Astroid stack.
 
 | Plugin | What it does | Status |
 | --- | --- | --- |
-| `louise` | Specialist subagents and skills for architecture, design, UX, docs, support, and review, backed by the `louise` MCP server | 0.1.0 |
+| `louise` | Specialist subagents and skills for architecture, design, UX, docs, support, and review, backed by the `louise` MCP server | 0.1.1 |
 
 ## Install
 

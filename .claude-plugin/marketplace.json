@@ -10,7 +10,7 @@
       "name": "louise",
       "source": "./plugins/louise",
       "description": "Specialist subagents and skills for the Louise / Astroid stack, backed by the Louise knowledge server.",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "license": "MIT",
       "homepage": "https://github.com/bowenlabs/claude-plugins"
     }

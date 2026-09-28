@@ -1,6 +1,6 @@
 {
   "name": "louise",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Specialist subagents and skills for the Louise / Astroid stack: architecture, design, UX, docs, support, and review, backed by the Louise knowledge server.",
   "author": {
     "name": "Bowen Labs",
