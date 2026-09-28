@@ -1,0 +1,18 @@
+{
+  "name": "bowenlabs",
+  "owner": {
+    "name": "Bowen Labs",
+    "email": "baylee@bowenlabs.io"
+  },
+  "description": "Claude Code plugins for the Louise / Astroid stack.",
+  "plugins": [
+    {
+      "name": "louise",
+      "source": "./plugins/louise",
+      "description": "Specialist subagents and skills for the Louise / Astroid stack, backed by the Louise knowledge server.",
+      "version": "0.1.0",
+      "license": "MIT",
+      "homepage": "https://github.com/bowenlabs/claude-plugins"
+    }
+  ]
+}

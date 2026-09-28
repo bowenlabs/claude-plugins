@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+# One job, named CI, because that's the required check: the house prose check
+# (every skill, agent, and doc against the Google developer documentation
+# style guide and the Louise house package, louise-toolkit ADR 0013), then the
+# plugin and marketplace manifests. The evals call a model, so they run
+# locally, not here (README § Evals).
+jobs:
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      # `vale sync` fetches the packages pinned in .vale.ini into the gitignored
+      # .vale/, and `lint:docs` fails on any error-level finding.
+      - name: Documentation style (Vale + Google)
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+        run: |
+          corepack enable
+          corepack pnpm --package=@vvago/vale@3.17.1 dlx vale sync
+          corepack pnpm run lint:docs
+
+      - name: Validate the plugin and the marketplace
+        run: |
+          npm install --global @anthropic-ai/claude-code
+          claude plugin validate plugins/louise --strict
+          claude plugin validate .
