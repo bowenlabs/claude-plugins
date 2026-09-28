@@ -1,0 +1,13 @@
+{
+  "name": "@bowenlabs/claude-plugins",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint:docs": "node .vale/Louise/lint-docs.mjs --exclude=\"^plugins/[^/]+/evals/(.+/)?(fixtures|mocks)/\"",
+    "validate": "claude plugin validate plugins/louise"
+  },
+  "engines": {
+    "node": ">=26.0.0"
+  },
+  "packageManager": "pnpm@12.6.0"
+}

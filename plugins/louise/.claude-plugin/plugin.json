@@ -1,0 +1,20 @@
+{
+  "name": "louise",
+  "version": "0.1.0",
+  "description": "Specialist subagents and skills for the Louise / Astroid stack: architecture, design, UX, docs, support, and review, backed by the Louise knowledge server.",
+  "author": {
+    "name": "Bowen Labs",
+    "email": "baylee@bowenlabs.io"
+  },
+  "homepage": "https://github.com/bowenlabs/claude-plugins",
+  "repository": "https://github.com/bowenlabs/claude-plugins",
+  "license": "MIT",
+  "keywords": [
+    "louise",
+    "astroid",
+    "astro",
+    "cloudflare",
+    "design-review",
+    "architecture"
+  ]
+}

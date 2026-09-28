@@ -1,0 +1,5 @@
+.vale/
+node_modules/
+
+# Plugin eval results, written by `claude plugin eval`.
+plugins/*/evals/results/

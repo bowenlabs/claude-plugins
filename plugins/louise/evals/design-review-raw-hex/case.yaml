@@ -1,0 +1,5 @@
+schema_version: "1.1"
+name: design-review-raw-hex
+description: A component with a literal color that a design token already holds. The review has to run every step and name the token.
+context:
+  scaffold_script: scaffold.sh

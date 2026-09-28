@@ -1,0 +1,5 @@
+schema_version: "1.1"
+name: style-check-seeded
+description: A doc seeded with Google-style violations. The check has to fix them in place.
+context:
+  scaffold_script: scaffold.sh
