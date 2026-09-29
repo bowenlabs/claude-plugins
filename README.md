@@ -138,18 +138,20 @@ label. Each removes its label when it finishes, so adding the label again
 runs it again.
 
 - **`louise-diagnose.yml`, the `agent:diagnose` label:** the `louise:support`
-  agent runs the `diagnose` skill and posts the diagnosis as one comment. The
-  prompt names only the repository and the issue number, and the agent can
-  read and comment, nothing else. It runs only when the person who added the
-  label has write access.
+  agent runs the `diagnose` skill, and the workflow posts the diagnosis as
+  one comment. The agent gets no shell: a workflow step collects the issue,
+  the recent history, and the latest failing run's log into files first, and
+  the agent reads those and writes its diagnosis to a file. It runs only
+  when the person who added the label, and whoever re-runs it, has write
+  access.
 - **`louise-fix.yml`, the `agent:fix` label:** the `louise:developer` agent
-  fixes the issue in a checkout and runs the repository's checks. A second
-  job, on a fresh runner, applies the change, refuses anything under
-  `.github/`, and pushes a `louise/fix-<issue>-<run>` branch with a pull
-  request, as the Louise agent GitHub App. Nothing merges it. It runs only
-  when a repository admin added the label, and skips a site whose
-  `workers/site/wrangler.jsonc` has no `previews` block, since that site's
-  branches still deploy production.
+  fixes the issue in a checkout and runs the repository's checks. It hands
+  its change on as a patch. A second job, on a fresh runner, applies it,
+  refuses what it must, and pushes a `louise/fix-<issue>-<run>-<attempt>`
+  branch with a pull request, as the Louise agent GitHub App. Nothing merges
+  it. It runs only when a repository admin added the label, and skips a site
+  whose `workers/site/wrangler.jsonc` has no `previews` block, since that
+  site's branches still deploy production.
 
 A repository calls them from one workflow. Leave out the `fix` job on a
 repository whose branches don't deploy to staging:
@@ -164,6 +166,7 @@ on:
 permissions:
   contents: read
   issues: write
+  actions: read
 
 jobs:
   diagnose:
@@ -187,15 +190,36 @@ jobs:
 Diagnose needs the same two secrets as the review. Fix also needs the Louise
 agent GitHub App: its ID in the `LOUISE_AGENT_APP_ID` variable and its private
 key in the `LOUISE_AGENT_APP_PRIVATE_KEY` secret. The app needs `Contents` and
-`Pull requests` write on the repositories it's installed on, and nothing else.
-It pushes because a push made with the workflow's own token doesn't start
-other workflows, and `CI` is a required check. Until a repository has what a
-workflow needs, that workflow skips with a notice.
+`Pull requests` write on the repositories it's installed on, and nothing else,
+and the workflow narrows each token it mints to the one repository. It pushes
+because a push made with the workflow's own token doesn't start other
+workflows, and `CI` is a required check. Give `main` a ruleset that lets only
+repository admins update it, so the app can push a branch but never merge.
+Until a repository has what a workflow needs, that workflow skips with a
+notice.
 
-The issue is untrusted input. Diagnose can only read and comment. Fix can
-edit files and run the repository's pnpm scripts, which is enough to run code
-with the Claude and Louise tokens in reach, so add `agent:fix` only to an
-issue you've read.
+### What the agents can reach
+
+The issue is untrusted input, so both workflows limit what text reaches the
+agent and what the agent can do with it:
+
+- **What the agent reads:** the issue's title and body as they were when the
+  label went on, taken from the event, and comments written before then by
+  the repository's owners and collaborators or by Louise itself. A run stops
+  if the issue was edited after the label went on.
+- **The runner:** the agent's job takes away sudo and Docker before anything
+  else, has a GitHub token that can only read, and starts the agent with
+  credentials kept out of any process it runs.
+- **Diagnose:** no shell, no network tools, and no reads outside the
+  workspace. It writes one file. A second job refuses a diagnosis that
+  contains a credential, then posts it.
+- **Fix:** it can edit files and run the repository's pnpm scripts, which is
+  enough to run code, so the admin who adds the label vouches for the issue
+  as it stands. The `publish` job refuses a change to `.github/`, `.claude/`,
+  `.vscode/`, `.devcontainer/`, `.mcp.json`, or `.envrc`, and a patch or pull
+  request text that contains a credential. It warns at the top of the pull
+  request about a change to `package.json`, `.npmrc`, `pnpm-workspace.yaml`,
+  `wrangler.jsonc`, or a config file. The app's key is read only there.
 
 ## Evals
 
