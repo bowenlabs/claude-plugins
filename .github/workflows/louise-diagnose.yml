@@ -206,6 +206,19 @@ jobs:
             --allowedTools "Read,Grep,Glob,Task,Agent,Skill,mcp__plugin_louise_louise__*,Edit(./.louise/diagnosis.md)"
             --disallowedTools "Bash,WebFetch,WebSearch,NotebookEdit,Read(//proc/**),Read(//sys/**),Read(//etc/**),Read(//tmp/**),Read(//home/runner/work/_temp/**),Read(~/.claude/**),Read(~/.config/**),Read(./.git/**)"
 
+      # Which tools the agent used, and its last message, so a run that ends
+      # without a diagnosis can be read from the log. The agent can't read a
+      # credential, so there's none to print.
+      - if: always() && steps.claude.outputs.execution_file != ''
+        name: Show how the agent finished
+        env:
+          EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
+        run: |
+          echo "Tools used:"
+          jq -r '[.[] | select(.type == "assistant") | .message.content[]? | select(.type == "tool_use") | .name] | group_by(.) | map("  \(.[0]) x\(length)") | .[]' "$EXECUTION_FILE" || true
+          echo "Last message:"
+          jq -r '[.[] | select(.type == "result")] | last | .result // "(none)"' "$EXECUTION_FILE" | head -c 4000 || true
+
       - if: always() && steps.evidence.outputs.stale == 'false'
         name: Check the diagnosis
         id: result
