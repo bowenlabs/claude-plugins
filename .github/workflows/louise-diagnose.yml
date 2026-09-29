@@ -183,6 +183,9 @@ jobs:
         env:
           # The plugin's `.mcp.json` sends this as the bearer token.
           LOUISE_KNOWLEDGE_TOKEN: ${{ secrets.louise_token }}
+          # The session ends when the main agent stops, so a subagent left
+          # running in the background never reports back.
+          CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1"
         with:
           claude_code_oauth_token: ${{ secrets.claude_code_oauth_token }}
           anthropic_api_key: ${{ secrets.anthropic_api_key }}
@@ -199,7 +202,7 @@ jobs:
             - `.louise/latest-failure.log`: the failing steps' log from the latest failed run, when there is one.
 
             1. Read `.louise/issue.md`.
-            2. Have the `louise:support` agent run the `louise:diagnose` skill on the symptom it describes. Work down the tiers and stop at the first that answers it: a known fix (`find_similar_fix`), then a diagnosis from the code in this checkout and the files above, and the incident record when the Louise server lists it. Every claim cites what showed it: a file and line, a commit, a run, or the source Louise returned. You have no shell; read files with Read, Grep, and Glob.
+            2. Have the `louise:support` agent run the `louise:diagnose` skill on the symptom it describes. Run it in the foreground and wait for its report: this run ends when you stop, so a background agent's report never arrives. Work down the tiers and stop at the first that answers it: a known fix (`find_similar_fix`), then a diagnosis from the code in this checkout and the files above, and the incident record when the Louise server lists it. Every claim cites what showed it: a file and line, a commit, a run, or the source Louise returned. You have no shell; read files with Read, Grep, and Glob.
             3. Write the diagnosis to `.louise/diagnosis.md`, and write nothing else. Start with the line `<!-- louise-diagnose -->`, then the skill's report: tier, cause, evidence, fix, and source. When the fix is a code change, describe it so someone can apply it, with its files. When it needs a secret, a setting, or a production change, give the command for Baylee to run. The workflow posts the file as a comment on the issue.
           claude_args: >-
             --max-turns 80
