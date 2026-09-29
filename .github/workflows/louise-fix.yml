@@ -201,6 +201,14 @@ jobs:
           # read-write for both users, including files either creates later;
           # the directories above it are traverse only.
           sudo chmod 700 "$HOME"
+          path="$GITHUB_WORKSPACE"
+          while [ "$path" != "$HOME" ] && [ "$path" != / ]; do
+            parent="$(dirname "$path")"
+            for entry in "$parent"/* "$parent"/.[!.]*; do
+              if [ -e "$entry" ] && [ "$entry" != "$path" ]; then sudo chmod o-rwx "$entry"; fi
+            done
+            path="$parent"
+          done
           sudo setfacl -R -m u:agent:rwX,u:runner:rwX "$GITHUB_WORKSPACE"
           sudo find "$GITHUB_WORKSPACE" -type d -exec setfacl -d -m u:agent:rwX,u:runner:rwX {} +
           dir="$(dirname "$GITHUB_WORKSPACE")"
