@@ -104,7 +104,11 @@ reusable workflow stored in a private one.
 Like the diagnose tier, the agent gets no shell: a workflow step collects the
 pull request and its diff into files, the agent writes its review to a file,
 and a second job refuses a review that contains a credential, then posts it
-as `bowenlabs-louise-agent[bot]`.
+as `bowenlabs-louise-agent[bot]`. The step also runs Vale on the changed files,
+with the repository's `.vale.ini` and the house `lint-docs` runner, and the
+review reports each finding on a line the pull request changed. For a UI
+change, the reviewer runs the `design-review` skill on the changed files, with
+the steps that need a URL left out.
 
 A repository calls it from its own workflow:
 
@@ -140,6 +144,44 @@ It needs two secrets, and the Louise agent app to post as it:
   source. The louise-ops RUNBOOK says how to make and rotate one.
 - **The app:** `agent_app_id` and `agent_app_private_key`, described in the
   next section. Without them, the review posts as `github-actions[bot]`.
+
+## Mentions in CI
+
+`.github/workflows/louise-mention.yml` answers a comment that mentions
+`@louise` on an issue or pull request, for design and architecture
+discussions. The agent picks the Louise agent the question belongs to
+(architect, designer, product, reviewer, or support) and posts one reply as
+`bowenlabs-louise-agent[bot]`: in the thread, for a comment on a line of code.
+Only someone with write access can mention it. It has the same limits as the
+diagnose tier below: the comment, the thread, and a pull request's diff are
+collected into files first, the agent has no shell and writes one file, and a
+second job refuses a reply that contains a credential.
+
+```yaml
+name: Louise mention
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  mention:
+    if: contains(github.event.comment.body, '@louise')
+    uses: bowenlabs/claude-plugins/.github/workflows/louise-mention.yml@main
+    with:
+      agent_app_id: ${{ vars.LOUISE_AGENT_APP_ID }}
+    secrets:
+      claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      louise_token: ${{ secrets.LOUISE_REVIEW_TOKEN }}
+      agent_app_private_key: ${{ secrets.LOUISE_AGENT_APP_PRIVATE_KEY }}
+```
 
 ## Diagnose and fix in CI
 
