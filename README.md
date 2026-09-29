@@ -131,6 +131,106 @@ It needs two secrets:
   give it `public` visibility only, so a review there can't quote a private
   source. The louise-ops RUNBOOK says how to make and rotate one.
 
+## Diagnose and fix in CI
+
+Two more reusable workflows run an agent on an issue when someone adds a
+label. Each removes its label when it finishes, so adding the label again
+runs it again.
+
+- **`louise-diagnose.yml`, the `agent:diagnose` label:** the `louise:support`
+  agent runs the `diagnose` skill, and the workflow posts the diagnosis as
+  one comment. The agent gets no shell: a workflow step collects the issue,
+  the recent history, and the latest failing run's log into files first, and
+  the agent reads those and writes its diagnosis to a file. It runs only
+  when the person who added the label, and whoever re-runs it, has write
+  access.
+- **`louise-fix.yml`, the `agent:fix` label:** the `louise:developer` agent
+  fixes the issue in a checkout and runs the repository's checks. It hands
+  its change on as a patch. A second job, on a fresh runner, applies it,
+  refuses what it must, and pushes a `louise/fix-<issue>-<run>-<attempt>`
+  branch with a pull request, as the Louise agent GitHub App. Nothing merges
+  it. It runs only when a repository admin added the label, and skips a site
+  whose `workers/site/wrangler.jsonc` has no `previews` block, since that
+  site's branches still deploy production.
+
+A repository calls them from one workflow. Leave out the `fix` job on a
+repository whose branches don't deploy to staging:
+
+```yaml
+name: Louise agents
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: read
+  issues: write
+  actions: read
+
+jobs:
+  diagnose:
+    if: github.event.label.name == 'agent:diagnose'
+    uses: bowenlabs/claude-plugins/.github/workflows/louise-diagnose.yml@main
+    with:
+      agent_app_id: ${{ vars.LOUISE_AGENT_APP_ID }}
+    secrets:
+      claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      louise_token: ${{ secrets.LOUISE_REVIEW_TOKEN }}
+      agent_app_private_key: ${{ secrets.LOUISE_AGENT_APP_PRIVATE_KEY }}
+
+  fix:
+    if: github.event.label.name == 'agent:fix'
+    uses: bowenlabs/claude-plugins/.github/workflows/louise-fix.yml@main
+    with:
+      agent_app_id: ${{ vars.LOUISE_AGENT_APP_ID }}
+    secrets:
+      claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      agent_app_private_key: ${{ secrets.LOUISE_AGENT_APP_PRIVATE_KEY }}
+```
+
+Diagnose needs the same two secrets as the review. Both use the Louise agent
+GitHub App, `bowenlabs-louise-agent`: its ID in the `LOUISE_AGENT_APP_ID`
+variable and its private key in the `LOUISE_AGENT_APP_PRIVATE_KEY` secret. Its
+comments come from the app, and fix needs it to push. The app has `Contents`,
+`Issues`, and `Pull requests` write, and each workflow narrows every token it
+mints to the one repository and the one permission the job needs. Without the
+app, diagnose posts as `github-actions[bot]`, and fix doesn't run. It pushes
+because a push made with the workflow's own token doesn't start other
+workflows, and `CI` is a required check. Give `main` a ruleset that lets only
+repository admins update it, so the app can push a branch but never merge.
+Until a repository has what a workflow needs, that workflow skips with a
+notice.
+
+### What the agents can reach
+
+The issue is untrusted input, so both workflows limit what text reaches the
+agent and what the agent can do with it:
+
+- **What the agent reads:** the issue's title and body as they were when the
+  label went on, taken from the event, and comments written before then by
+  the repository's owners and collaborators or by Louise itself. A run stops
+  if the issue was edited after the label went on.
+- **The runner:** the agent's job takes away sudo and Docker, has a GitHub
+  token that can only read, and starts the agent with credentials kept out of
+  any process it runs.
+- **Earlier diagnoses:** only comments from `bowenlabs-louise-agent[bot]` count,
+  since any workflow in the repository can post as `github-actions[bot]`.
+- **Diagnose:** no shell, no network tools, and no reads outside the
+  workspace. It writes one file. A second job refuses a diagnosis that
+  contains a credential, then posts it.
+- **Fix:** it can edit files in the workspace and run the repository's pnpm
+  scripts, which is enough to run code. Those commands run as a separate
+  `agent` user with no network, no sudo, and access to the workspace only, so
+  they can't reach the Claude credential or send anything out. The job has no
+  Louise token, dependencies are installed before the agent starts, and a check
+  that needs the network fails there. The admin who adds the label still
+  vouches for the issue as it stands. The `publish` job refuses a change to `.github/`, `.claude/`,
+  `.vscode/`, `.devcontainer/`, `.mcp.json`, or `.envrc`, and a patch or pull
+  request text that contains a credential. It warns at the top of the pull
+  request about a change to `package.json`, `.npmrc`, `pnpm-workspace.yaml`,
+  `wrangler.jsonc`, or a config file. The app's key is read only there.
+
 ## Evals
 
 `plugins/louise/evals/` holds one case for each of the plugin's acceptance
