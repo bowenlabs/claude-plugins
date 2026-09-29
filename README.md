@@ -108,7 +108,9 @@ as `bowenlabs-louise-agent[bot]`. The step also runs Vale on the changed files,
 with the repository's `.vale.ini` and the house `lint-docs` runner, and the
 review reports each finding on a line the pull request changed. For a UI
 change, the reviewer runs the `design-review` skill on the changed files, with
-the steps that need a URL left out.
+the steps that need a URL left out. In a site repository, it also flags code
+that another site would want, names whether it belongs in louise-toolkit or
+astroidjs, and points to the `pull-up` skill.
 
 A repository calls it from its own workflow:
 
