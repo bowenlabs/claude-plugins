@@ -196,8 +196,11 @@ jobs:
           sudo iptables -I OUTPUT 1 -m owner --uid-owner agent ! -o lo -j REJECT
           sudo ip6tables -I OUTPUT 1 -m owner --uid-owner agent ! -o lo -j REJECT
 
-          # The workspace, read-write, for both users, including files either
-          # creates later; the directories above it, traverse only.
+          # The runner's home, which holds the step scripts in `_temp` and the
+          # actions' code, is closed to other users. The workspace inside it is
+          # read-write for both users, including files either creates later;
+          # the directories above it are traverse only.
+          sudo chmod 700 "$HOME"
           sudo setfacl -R -m u:agent:rwX,u:runner:rwX "$GITHUB_WORKSPACE"
           sudo find "$GITHUB_WORKSPACE" -type d -exec setfacl -d -m u:agent:rwX,u:runner:rwX {} +
           dir="$(dirname "$GITHUB_WORKSPACE")"
@@ -229,6 +232,9 @@ jobs:
             || { echo "::error::corepack doesn't run as the agent user."; exit 1; }
           if /opt/louise-sandbox/bin/corepack pnpm exec node -e 'fetch("https://api.github.com").then(()=>process.exit(0),()=>process.exit(1))'; then
             echo "::error::The agent user can still reach the network."; exit 1
+          fi
+          if /opt/louise-sandbox/bin/corepack pnpm exec node -e "require('fs').readdirSync('$RUNNER_TEMP')" 2>/dev/null; then
+            echo "::error::The agent user can read the runner's step files."; exit 1
           fi
           # This step's shell runs as the runner user, like Claude Code will.
           if /opt/louise-sandbox/bin/corepack pnpm exec node -e "require('fs').readFileSync('/proc/$$/environ')" 2>/dev/null; then

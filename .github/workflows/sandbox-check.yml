@@ -40,4 +40,6 @@ jobs:
           git status --porcelain
           if sudo -n true 2>/dev/null; then echo "sudo to root still works"; exit 1; fi
           if corepack pnpm exec node -e 'require("fs").readdirSync("/home/runner/work/_temp")' 2>/dev/null; then echo "agent can read _temp"; exit 1; fi
+          if corepack pnpm exec node -e 'require("fs").readdirSync(require("os").homedir().replace("agent","runner") + "/.cache")' 2>/dev/null; then echo "agent can read the runner's home"; exit 1; fi
+          if corepack pnpm exec node -e 'require("fs").readdirSync("/home/runner")' 2>/dev/null; then echo "agent can list the runner's home"; exit 1; fi
           echo "sandbox OK"
