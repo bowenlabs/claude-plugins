@@ -31,8 +31,8 @@ name: Louise fix
 #   comments from the repository's owners and collaborators, and Louise's own
 #   diagnoses, only. The run stops if the issue was edited after the label
 #   went on. The admin who adds the label vouches for that text.
-# - Every command the agent runs runs as a separate `agent` user with no
-#   network, that can read and write the workspace and nothing else of the
+# - Every command the agent runs runs as a separate `agent` user, started
+#   with an empty environment, with no network, that can read and write the workspace and nothing else of the
 #   runner's, so it can't reach the Claude credential in the Claude Code
 #   process or send anything anywhere. The agent can edit files only in the
 #   workspace. The job has no Louise token, and no root: sudo and Docker are
@@ -267,8 +267,6 @@ jobs:
       - if: steps.evidence.outputs.stale == 'false'
         id: claude
         uses: anthropics/claude-code-action@v1
-        env:
-          CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1"
         with:
           claude_code_oauth_token: ${{ secrets.claude_code_oauth_token }}
           anthropic_api_key: ${{ secrets.anthropic_api_key }}
