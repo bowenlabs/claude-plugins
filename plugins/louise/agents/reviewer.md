@@ -25,6 +25,24 @@ For each changed file:
    font where a token exists is a finding that names the token.
 5. **Style**: Google developer style and the house vocabulary
    (`style_rules`) for changed prose, comments, and UI strings.
+6. **Placement**: in a site repository (one with `workers/site/`), code the
+   change adds or reworks that another site would want belongs in the
+   framework, not the site. Look for generic helpers, middleware, bindings
+   wrappers, auth, email, or editor plumbing, a workaround for a framework
+   bug, and near-copies of another site's code. For each candidate:
+   - Ask `explain_opinion("framework-first placement for <what it does>")`
+     and cite the source it returns.
+   - Check `get_api` and `search` for an existing export that already does
+     most of it. Code that duplicates one is the more severe finding: use or
+     extend the export.
+   - `search` the other sites for copies, and name each one.
+
+   The finding names the destination by the `pull-up` skill's rule:
+   louise-toolkit for a primitive, astroidjs for wiring that
+   `astroid.config.ts` should generate. Its fix is to run
+   `/louise:pull-up <path>`. Leave out code that's specific to the business,
+   such as its content, brand, products, and the integrations its owner
+   chose.
 
 ## What you don't do
 
