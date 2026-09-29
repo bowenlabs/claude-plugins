@@ -19,9 +19,12 @@ name: Louise diagnose
 #     diagnose:
 #       if: github.event.label.name == 'agent:diagnose'
 #       uses: bowenlabs/claude-plugins/.github/workflows/louise-diagnose.yml@main
+#       with:
+#         agent_app_id: ${{ vars.LOUISE_AGENT_APP_ID }}
 #       secrets:
 #         claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 #         louise_token: ${{ secrets.LOUISE_REVIEW_TOKEN }}
+#         agent_app_private_key: ${{ secrets.LOUISE_AGENT_APP_PRIVATE_KEY }}
 #
 # The issue is untrusted input, so the agent gets no shell and no way to post:
 #
@@ -33,7 +36,9 @@ name: Louise diagnose
 #   server, and writes its diagnosis to one file. It can't run commands, read
 #   outside the workspace, or reach the network any other way.
 # - A second job, on a fresh runner, refuses a diagnosis that contains a
-#   secret, then posts it.
+#   secret, then posts it as the Louise agent app, with a token that can only
+#   write this repository's issues. Only that app's comments count as earlier
+#   diagnoses: any workflow in the repository can post as github-actions[bot].
 #
 # Only someone with write access can start a run, whether by adding the label
 # or by re-running the workflow.
@@ -41,6 +46,10 @@ name: Louise diagnose
 on:
   workflow_call:
     inputs:
+      agent_app_id:
+        description: The Louise agent GitHub App's ID, from the LOUISE_AGENT_APP_ID variable. Without it, the diagnosis posts as github-actions[bot].
+        type: string
+        default: ""
       debug:
         description: Upload the session's transcript as an artifact, kept 3 days. Only for a private repository, since a public one's artifacts are public.
         type: boolean
@@ -55,6 +64,9 @@ on:
       louise_token:
         description: A Louise read token for this repository's visibility.
         required: true
+      agent_app_private_key:
+        description: The Louise agent GitHub App's private key. Only the `post` job reads it.
+        required: false
 
 jobs:
   diagnose:
@@ -153,7 +165,7 @@ jobs:
           {
             printf '# Issue #%s: %s\n\n%s\n' "$ISSUE" "$TITLE" "$BODY"
             gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$ISSUE/comments" \
-              --jq ".[] | select(.created_at <= \"$LABELED_AT\" and .updated_at <= \"$LABELED_AT\") | select((.author_association | IN(\"OWNER\", \"MEMBER\", \"COLLABORATOR\")) or (.user.login == \"github-actions[bot]\" and (.body | startswith(\"<!-- louise-\")))) | \"\n## Comment by \(.user.login), \(.created_at)\n\n\(.body)\""
+              --jq ".[] | select(.created_at <= \"$LABELED_AT\" and .updated_at <= \"$LABELED_AT\") | select((.author_association | IN(\"OWNER\", \"MEMBER\", \"COLLABORATOR\")) or (.user.login == \"bowenlabs-louise-agent[bot]\" and (.body | startswith(\"<!-- louise-\")))) | \"\n## Comment by \(.user.login), \(.created_at)\n\n\(.body)\""
           } > .louise/issue.md
           git log -30 --stat --no-color --no-ext-diff > .louise/history.txt
           gh run list --branch "$DEFAULT_BRANCH" --limit 20 \
@@ -234,10 +246,28 @@ jobs:
     permissions:
       issues: write
     env:
-      GH_TOKEN: ${{ github.token }}
       ISSUE: ${{ github.event.issue.number }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
+      # Comment as the Louise agent app, with a token that can only write this
+      # repository's issues. Without the app, or until its installation has the
+      # Issues permission, fall back to the workflow's own token.
+      - name: Check for the app
+        id: has-app
+        env:
+          HAS_KEY: ${{ secrets.agent_app_private_key != '' && inputs.agent_app_id != '' }}
+        run: echo "ready=$HAS_KEY" >> "$GITHUB_OUTPUT"
+
+      - if: steps.has-app.outputs.ready == 'true'
+        id: app-token
+        continue-on-error: true
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ inputs.agent_app_id }}
+          private-key: ${{ secrets.agent_app_private_key }}
+          repositories: ${{ github.event.repository.name }}
+          permission-issues: write
+
       - if: needs.diagnose.outputs.outcome == 'written'
         uses: actions/download-artifact@v4
         with:
@@ -247,6 +277,7 @@ jobs:
       - if: needs.diagnose.outputs.ready == 'true'
         name: Post the diagnosis
         env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
           OUTCOME: ${{ needs.diagnose.outputs.outcome }}
           STALE: ${{ needs.diagnose.outputs.stale }}
           LOUISE_SECRET: ${{ secrets.louise_token }}
@@ -280,4 +311,6 @@ jobs:
       # by someone without write access doesn't stay.
       - name: Remove the label
         if: always()
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
         run: gh issue edit "$ISSUE" --repo "$GITHUB_REPOSITORY" --remove-label agent:diagnose || true

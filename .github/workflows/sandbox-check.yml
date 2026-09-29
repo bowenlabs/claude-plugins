@@ -1,0 +1,43 @@
+# TEMPORARY, for bowenlabs/claude-plugins#17 only: runs louise-fix.yml's
+# sandbox step, taken from that file, on ubuntu-latest. Removed before merge.
+name: Sandbox check
+
+on:
+  pull_request:
+    paths: [.github/workflows/louise-fix.yml, .github/workflows/sandbox-check.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  sandbox:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Install
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+        run: |
+          corepack enable
+          corepack pnpm install --frozen-lockfile
+      - name: Run the sandbox step from louise-fix.yml
+        run: |
+          ruby -ryaml -e 'puts YAML.load_file(".github/workflows/louise-fix.yml")["jobs"]["fix"]["steps"].find { |s| s["name"] == "Sandbox the agent'"'"'s commands" }["run"]' > "$RUNNER_TEMP/sandbox.sh"
+          bash -e "$RUNNER_TEMP/sandbox.sh"
+      - name: Use it the way the agent will
+        run: |
+          set -x
+          command -v corepack
+          corepack pnpm --version
+          corepack pnpm exec node -e 'console.log(require("os").userInfo().username, process.env.GITHUB_TOKEN ? "HAS TOKEN" : "no token")'
+          corepack pnpm exec node -e 'require("fs").writeFileSync("written-by-agent.txt", "ok")'
+          cat written-by-agent.txt && rm written-by-agent.txt
+          git status --porcelain
+          if sudo -n true 2>/dev/null; then echo "sudo to root still works"; exit 1; fi
+          if corepack pnpm exec node -e 'require("fs").readdirSync("/home/runner/work/_temp")' 2>/dev/null; then echo "agent can read _temp"; exit 1; fi
+          echo "sandbox OK"
