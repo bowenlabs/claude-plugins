@@ -94,12 +94,17 @@ as `mcp__plugin_louise_louise__*`.
 ## Review in CI
 
 `.github/workflows/louise-review.yml` is a reusable workflow that runs the
-`louise:reviewer` agent on a pull request and posts one comment. It edits
-that comment on each later push, and never edits files, pushes, or approves.
-It skips drafts, pull requests from bots, and pull requests from forks, which
-GitHub runs without secrets. It lives in this repository because this one is
-public, and a public repository can't call a reusable workflow stored in a
-private one.
+`louise:reviewer` agent on a pull request and posts one comment, which it
+edits on each later push. It never edits files, pushes, or approves. It skips
+drafts, pull requests from forks, which GitHub runs without secrets, and
+pull requests from bots other than the Louise agent app. It lives in this
+repository because this one is public, and a public repository can't call a
+reusable workflow stored in a private one.
+
+Like the diagnose tier, the agent gets no shell: a workflow step collects the
+pull request and its diff into files, the agent writes its review to a file,
+and a second job refuses a review that contains a credential, then posts it
+as `bowenlabs-louise-agent[bot]`.
 
 A repository calls it from its own workflow:
 
@@ -117,12 +122,15 @@ permissions:
 jobs:
   review:
     uses: bowenlabs/claude-plugins/.github/workflows/louise-review.yml@main
+    with:
+      agent_app_id: ${{ vars.LOUISE_AGENT_APP_ID }}
     secrets:
       claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
       louise_token: ${{ secrets.LOUISE_REVIEW_TOKEN }}
+      agent_app_private_key: ${{ secrets.LOUISE_AGENT_APP_PRIVATE_KEY }}
 ```
 
-It needs two secrets:
+It needs two secrets, and the Louise agent app to post as it:
 
 - **A Claude credential:** a Claude Code OAuth token from `claude setup-token`,
   passed as `claude_code_oauth_token`, or an Anthropic API key, passed as
@@ -130,6 +138,8 @@ It needs two secrets:
 - **A Louise read token,** passed as `louise_token`. In a public repository,
   give it `public` visibility only, so a review there can't quote a private
   source. The louise-ops RUNBOOK says how to make and rotate one.
+- **The app:** `agent_app_id` and `agent_app_private_key`, described in the
+  next section. Without them, the review posts as `github-actions[bot]`.
 
 ## Diagnose and fix in CI
 
