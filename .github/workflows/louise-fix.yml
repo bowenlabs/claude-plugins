@@ -290,6 +290,19 @@ jobs:
             --allowedTools "Read,Grep,Glob,Edit(./**),Task,Agent,Skill,Bash(/opt/louise-sandbox/bin/corepack pnpm run:*)"
             --disallowedTools "WebFetch,WebSearch,NotebookEdit,mcp__plugin_louise_louise__*,Read(//proc/**),Read(//sys/**),Read(//home/runner/work/_temp/**),Read(~/.claude/**),Read(~/.config/**),Edit(./.git/**),Edit(./.louise/issue.md)"
 
+      # Which tools the agent used, and its last message, so a run that ends
+      # without a change can be read from the log. The agent can't read a
+      # credential, so there's none to print.
+      - if: always() && steps.claude.outputs.execution_file != ''
+        name: Show how the agent finished
+        env:
+          EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
+        run: |
+          echo "Tools used:"
+          jq -r '[.[] | select(.type == "assistant") | .message.content[]? | select(.type == "tool_use") | .name] | group_by(.) | map("  \(.[0]) x\(length)") | .[]' "$EXECUTION_FILE" || true
+          echo "Last message:"
+          jq -r '[.[] | select(.type == "result")] | last | .result // "(none)"' "$EXECUTION_FILE" | head -c 4000 || true
+
       # Everything below runs as the workflow. The agent could have changed
       # anything on this runner, including git's config, so this step only
       # packs the change up, with git's hooks, external diff, and filters off.
