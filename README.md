@@ -211,9 +211,8 @@ agent and what the agent can do with it:
   label went on, taken from the event, and comments written before then by
   the repository's owners and collaborators or by Louise itself. A run stops
   if the issue was edited after the label went on.
-- **The runner:** the agent's job takes away sudo and Docker, has a GitHub
-  token that can only read, and starts the agent with credentials kept out of
-  any process it runs.
+- **The runner:** the agent's job takes away sudo and Docker, and has a
+  GitHub token that can only read.
 - **Earlier diagnoses:** only comments from `bowenlabs-louise-agent[bot]` count,
   since any workflow in the repository can post as `github-actions[bot]`.
 - **Diagnose:** no shell, no network tools, and no reads outside the
