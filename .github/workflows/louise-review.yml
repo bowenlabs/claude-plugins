@@ -3,8 +3,16 @@ name: Louise review
 # The review tier of P4 (bowenlabs/louise-ops#8): the `louise:reviewer` agent
 # reads a pull request against the house rules, ADRs, design system, and
 # style through the Louise knowledge server, and the workflow posts its review
-# as one comment, which it edits on each later push. Nothing here edits files,
-# pushes, or approves.
+# as one comment, which it edits on each later review. Nothing here edits
+# files, pushes, or approves.
+#
+# Each review is a Claude session, so a pull request gets two on its own: one
+# when it opens or is marked ready, and one on the next push. After that, a
+# push doesn't start one. Ask for another by adding the `louise:review` label,
+# which the workflow removes once the review posts, or by marking the pull
+# request as a draft and then ready for review. In CI the session and every
+# subagent it starts run on Sonnet; the agents' own `model: opus` still holds
+# in a local session.
 #
 # A reusable workflow, so every repository calls the same one. It lives here
 # because this repository is public: a public repository can't call a
@@ -12,7 +20,7 @@ name: Louise review
 #
 #   on:
 #     pull_request:
-#       types: [opened, synchronize, ready_for_review, reopened]
+#       types: [opened, synchronize, ready_for_review, reopened, labeled]
 #   permissions:
 #     contents: read
 #     pull-requests: write
@@ -44,7 +52,8 @@ name: Louise review
 #
 # It skips drafts, forks (GitHub gives a fork's `pull_request` run no
 # secrets), and bots, except the Louise agent app, whose fix pull requests are
-# the ones that most need a review.
+# the ones that most need a review. A caller without `labeled` in its types
+# still works; only the label can't ask for a review there.
 
 on:
   workflow_call:
@@ -72,13 +81,50 @@ on:
         required: false
 
 jobs:
-  review:
+  # Whether this event gets a review. Each posted review carries its number
+  # on the comment's second line, so the count survives the comment being
+  # replaced. A push gets a review only while there have been fewer than two;
+  # opening, reopening, marking ready, and the `louise:review` label always do.
+  gate:
     if: >-
       github.event_name == 'pull_request' &&
       !github.event.pull_request.draft &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       (!endsWith(github.event.pull_request.user.login, '[bot]') ||
-       github.event.pull_request.user.login == 'bowenlabs-louise-agent[bot]')
+       github.event.pull_request.user.login == 'bowenlabs-louise-agent[bot]') &&
+      (github.event.action != 'labeled' || github.event.label.name == 'louise:review')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: read
+    outputs:
+      run: ${{ steps.count.outputs.run }}
+      count: ${{ steps.count.outputs.count }}
+    steps:
+      - name: Count the earlier reviews
+        id: count
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          ACTION: ${{ github.event.action }}
+        run: |
+          # A review from before the count was recorded counts as one.
+          count="$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$PR/comments" \
+            --jq '.[] | select(.user.type == "Bot" and (.body | startswith("<!-- louise-review -->")))
+                  | (.body | split("\n")[1] // "" | capture("^<!-- louise-review-count: (?<n>[0-9]+) -->$") | .n) // "1"' \
+            | sort -n | tail -n 1)"
+          count="${count:-0}"
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          if [ "$ACTION" = "synchronize" ] && [ "$count" -ge 2 ]; then
+            echo "::notice::Louise has reviewed this pull request $count times, so a push doesn't start another. Add the louise:review label to ask for one."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  review:
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -191,6 +237,11 @@ jobs:
           # The session ends when the main agent stops, so a subagent left
           # running in the background never reports back.
           CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1"
+          # Every subagent on Sonnet, over the `model: opus` in the agents'
+          # definitions, which a local session still uses. FORCE needs
+          # Claude Code 2.1.257 or later.
+          CLAUDE_CODE_SUBAGENT_MODEL: sonnet
+          CLAUDE_CODE_SUBAGENT_MODEL_FORCE: "1"
         with:
           claude_code_oauth_token: ${{ secrets.claude_code_oauth_token }}
           anthropic_api_key: ${{ secrets.anthropic_api_key }}
@@ -214,6 +265,7 @@ jobs:
                - **Design:** when the diff changes UI (`.astro`, `.css`, `.tsx`, `.jsx`, or theme files), run the `louise:design-review` skill on the changed UI files as well. It has no URL here, so skip the steps that need one and say so; the token check against `get_design_system` and the guidelines check from `.louise/web-interface-guidelines.md` still apply. Put its findings under a "Design" heading.
             3. Write the review to `.louise/review.md`, and write nothing else. Start with the line `<!-- louise-review -->`, then a one-line verdict, then the findings ranked most severe first, each with its file and line, the fix, and its citation. End with the repositories the change affects, or "No other repository affected." The workflow posts the file as the pull request's Louise review comment, replacing the earlier one.
           claude_args: >-
+            --model sonnet
             --max-turns 60
             --allowedTools "Read,Grep,Glob,Task,Agent,Skill,mcp__plugin_louise_louise__*,Edit(./.louise/review.md)"
             --disallowedTools "Bash,WebFetch,WebSearch,NotebookEdit,Read(//proc/**),Read(//sys/**),Read(//etc/**),Read(//tmp/**),Read(//home/runner/work/_temp/**),Read(~/.claude/**),Read(~/.config/**),Read(./.git/**)"
@@ -262,9 +314,9 @@ jobs:
 
   # A fresh runner that the agent never touched. It refuses a review that
   # contains a secret, then replaces this poster's earlier Louise review, or
-  # posts one.
+  # posts one, with the review's number on its second line.
   post:
-    needs: review
+    needs: [gate, review]
     if: always() && needs.review.outputs.outcome == 'written'
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -272,6 +324,7 @@ jobs:
       pull-requests: write
     env:
       PR: ${{ github.event.pull_request.number }}
+      COUNT: ${{ needs.gate.outputs.count }}
     steps:
       # Comment as the Louise agent app, with a token that can only write this
       # repository's pull requests. Without the app, or if minting fails, fall
@@ -314,6 +367,14 @@ jobs:
           if grep -qE 'gh[opsu]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|sk-ant-[A-Za-z0-9_-]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY-----' "$file"; then
             echo "::error::The review contains something shaped like a credential, so it wasn't posted."; exit 1
           fi
+          # The marker and the count come first, whatever the agent wrote.
+          body="$RUNNER_TEMP/louise/body.md"
+          {
+            echo "<!-- louise-review -->"
+            echo "<!-- louise-review-count: $((COUNT + 1)) -->"
+            sed '1{/^<!-- louise-review -->$/d;}' "$file"
+          } > "$body"
+          file="$body"
           # Replace this poster's earlier Louise review, or post a new one.
           existing="$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$PR/comments" \
             --jq ".[] | select(.user.login == \"$POSTER\" and (.body | startswith(\"<!-- louise-review -->\"))) | .id" | tail -n 1)"
@@ -322,3 +383,10 @@ jobs:
           else
             gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body-file "$file"
           fi
+
+      # So the label can ask for the next review.
+      - if: github.event.action == 'labeled'
+        name: Remove the louise:review label
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
+        run: gh api -X DELETE "repos/$GITHUB_REPOSITORY/issues/$PR/labels/louise%3Areview" --silent || true

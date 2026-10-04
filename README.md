@@ -95,7 +95,7 @@ as `mcp__plugin_louise_louise__*`.
 
 `.github/workflows/louise-review.yml` is a reusable workflow that runs the
 `louise:reviewer` agent on a pull request and posts one comment, which it
-edits on each later push. It never edits files, pushes, or approves. It skips
+edits on each later review. It never edits files, pushes, or approves. It skips
 drafts, pull requests from forks, which GitHub runs without secrets, and
 pull requests from bots other than the Louise agent app. It lives in this
 repository because this one is public, and a public repository can't call a
@@ -112,14 +112,22 @@ the steps that need a URL left out. In a site repository, it also flags code
 that another site would want, names whether it belongs in louise-toolkit or
 astroidjs, and points to the `pull-up` skill.
 
-A repository calls it from its own workflow:
+Each review is a Claude session, so a pull request gets two on its own: one
+when it opens or is marked ready, and one on the next push. Later pushes don't
+start one. To ask for another, add the `louise:review` label, which the
+workflow removes once the review posts, or mark the pull request as a draft
+and then ready for review. In CI, the review runs on Sonnet, subagents
+included; a local session keeps each agent's `model: opus`.
+
+A repository calls it from its own workflow, and makes the `louise:review`
+label once with `gh label create louise:review`:
 
 ```yaml
 name: Louise review
 
 on:
   pull_request:
-    types: [opened, synchronize, ready_for_review, reopened]
+    types: [opened, synchronize, ready_for_review, reopened, labeled]
 
 permissions:
   contents: read
