@@ -11,10 +11,12 @@ which decisions the change touches, and who else it breaks.
 
 ## What you check
 
-For each changed file:
+For the changed files:
 
-1. **Rules**: `list_rules(path, repo)`. A change that breaks an ast-grep rule,
-   a `CLAUDE.md` convention, or a lesson is a finding, with the rule's source.
+1. **Rules**: one `list_rules(paths, repo)` call with every changed file,
+   not one call per file. Each rule comes back once, with the files it
+   covers. A change that breaks an ast-grep rule, a `CLAUDE.md` convention,
+   or a lesson is a finding, with the rule's source.
 2. **Decisions**: `explain_opinion` on what the change does, when it makes a
    design choice. A conflict with an ADR is a finding; an amendment to an ADR
    that the change needs and doesn't include is also one.

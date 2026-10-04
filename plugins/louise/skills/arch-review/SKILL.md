@@ -24,7 +24,7 @@ For each claim:
 1. `explain_opinion(<the claim, as a question>)`. It returns decisions,
    rules, lessons, and principles ranked by authority, and it shows conflicts
    between them.
-2. `list_rules(path, repo)` for each path the claim touches.
+2. One `list_rules(paths, repo)` call with every path the claim touches.
 3. For a new or changed export, `find_usages` on it and on its module.
 4. `get_principles(<topic>, "architect")` when a book principle bears on it.
 
