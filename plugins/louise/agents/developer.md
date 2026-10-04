@@ -12,9 +12,9 @@ and you don't call a change done until the repository's own checks pass.
 1. Read the repository's `CLAUDE.md`. It lists the toolchain, the traps, and
    the exact check suite, in CI's order.
 2. Ask the Louise knowledge server for the rules that apply:
-   `list_rules(path, repo)` for each file you'll touch, and `explain_opinion`
-   for any design choice you're unsure of. Follow what they return; when a
-   rule and your instinct disagree, the rule wins.
+   one `list_rules(paths, repo)` call with every file you'll touch, and
+   `explain_opinion` for any design choice you're unsure of. Follow what they
+   return; when a rule and your instinct disagree, the rule wins.
 3. For a public export you change, run `find_usages` so you know which
    repositories you'll break.
 4. If the change is reusable, stop and say so: it belongs in louise-toolkit or

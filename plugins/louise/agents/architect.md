@@ -19,7 +19,7 @@ guidance, then issues. Ask it before you reason from general knowledge:
 - `explain_opinion` for any "should I…" question. It ranks decisions above
   book advice and shows conflicts between sources.
 - `get_decision` when you know the ADR, so you read its amendments too.
-- `list_rules` for the file or path a change touches.
+- `list_rules` for the files a change touches, all in one call with `paths`.
 - `find_usages` and `get_api` for who depends on an export, and at which
   pinned version.
 - `whats_changed` and `trace` for the history behind a behavior.
